@@ -1,0 +1,167 @@
+import React, { useEffect, useState } from "react";
+import { ethers } from "ethers";
+import './App.css';
+import abi from './utils/WavePortal.json';
+
+const App = () => {
+  const [message, setMessage] = useState("");
+  const [currentAccount, setCurrentAccount] = useState("");
+
+  const[allSongs, setAllSongs] = useState([]);
+
+  const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+
+  const contractABI = abi.abi;
+
+  const getAllSongs = async () =>{
+    
+    try{
+      const{ethereum} = window;
+      if(ethereum) {
+        const provider = new ethers.providers.Web3Provider(ehtereum);
+        const signer = provider.getSigner();
+        const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
+
+      const songs = await wavePortalContract.getAllSongs();
+
+        let songsCleaned = [];
+        songs.forEach(song => {
+          songsCleaned.push({
+            address: song.sender,
+            timestamp: new Date(song.timestamp * 1000),
+            messsage: song.message
+          });
+        });
+        setAllSongs(songsCleaned);
+      } else{
+        console.log("Ethereum object doesn't exist!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+const checkIfWalletIsConnected = async () => {
+    try {
+      const { ethereum } = window;
+
+      if (!ethereum) {
+        console.log("Make sure you have metamask!");
+        return;
+      } else {
+        console.log("We have the ethereum object", ethereum);
+      }
+
+      const accounts = await ethereum.request({ method: 'eth_accounts' });
+
+      if (accounts.length !== 0) {
+        const account = accounts[0];
+        console.log("Found an authorized account:", account);
+        setCurrentAccount(account);
+        getAllSongs();
+      } else {
+        console.log("No authorized account found")
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  const connectWallet = async () => {
+    try {
+      const { ethereum } = window;
+
+      if (!ethereum) {
+        alert("Get MetaMask!");
+        return;
+      }
+
+      const accounts = await ethereum.request({ method: "eth_requestAccounts" });
+
+      console.log("Connected", accounts[0]);
+      setCurrentAccount(accounts[0]); 
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const song = async () => {
+    try {
+      const { ethereum } = window;
+
+      if (ethereum) {
+        const provider = new ethers.providers.Web3Provider(ethereum);
+        const signer = provider.getSigner();
+        const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
+
+        const startEstimate = await wavePortalContract.estimateGas.song(message);
+        const songTxn = await wavePortalContract.song(message, {
+          gasLimit: startEstimate,
+        });
+
+        let count = await wavePortalContract.getSongLink();
+        console.log("Retrieved total song count...", count.toNumber());
+
+        console.log("Mining...", songTxn.hash);
+
+        await songTxn.wait();
+        console.log("Mined -- ", songTxn.hash);
+        
+        count = await wavePortalContract.getSongLink();
+        console.log("Retrieved total song count...", count.toNumber());
+      } else {
+        console.log("Ethereum object doesn't exist!");
+      }
+    } catch (error) {
+      console.log(error)
+    }
+  }
+  
+  useEffect(() => {
+    checkIfWalletIsConnected();
+  }, [])
+  
+  return (
+    <div className="mainContainer">
+
+      <div className="dataContainer">
+        <div className="header">
+        👋 Hey there!
+        </div>
+
+        <div className="bio">
+          Send me a song you have been hooked on to recently.<br></br> 
+          There might be a surprise for you !!<br></br>
+        </div>
+        <div class="form">
+        <input class="form__input" id = "link" type="url" autoComplete="off" placeholder=" " value={message} onChange={(e) => setMessage(e.target.value)}>
+          </input>
+        <label for="link" class="form__label"><b>Link...</b></label>
+          </div>
+        <div className="bio">
+          Connect your Ethereum wallet and send me a song!
+        </div>
+        {!currentAccount && (
+          <button className="Connect" onClick={connectWallet}><input class="button-meta" type="image"                                                      src="streamlinehq-crypto-wallet-metamask-money-payments-finance-20.PNG"></input>
+            <b>Connect Wallet!</b>
+          </button>
+        )}
+
+        {allSongs.map((song, index) => {
+      return (
+        <div key={index} style={{backgroundColor: "OldLace", marginTop: "16px", padding: "8px"}}>
+          <div>Address: {song.address}</div>
+              <div>Time: {song.timestamp.toString()}</div>
+              <div>Message: {song.message}</div>
+          </div>)
+        })} 
+        <button className="send" onClick={song}>
+          <b>Send!</b>
+          <input class="button-arrow" type="image" src="streamlinehq-interface-arrows-right-circle-1-interface-essential-20.PNG"></input>
+          </button>
+      </div>
+    </div>
+  );
+}
+
+export default App
